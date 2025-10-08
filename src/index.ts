@@ -1,0 +1,35 @@
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+dotenv.config();
+
+import authRoutes from "./routes/auth";
+import competitionsRoutes from "./routes/competitions";
+import usersRoutes from "./routes/users";
+import adminUsersRoutes from "./routes/admin.users";
+
+const app = express();
+
+// 1) middlewares base ANTES de las rutas
+app.use(cors({
+  origin: ["http://localhost:3000"],
+  credentials: true,
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"],
+}));
+app.use(express.json());
+
+// 2) rutas (una sola vez cada una)
+app.use("/api/auth", authRoutes);
+app.use("/api/users", usersRoutes);
+app.use("/api/competitions", competitionsRoutes);
+app.use("/api/admin/users", adminUsersRoutes);
+
+// health
+app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+// 404 JSON
+app.use((_req, res) => res.status(404).json({ ok:false, message:"Not Found" }));
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => console.log(`API en http://localhost:${PORT}`));

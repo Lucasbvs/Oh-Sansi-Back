@@ -1,0 +1,82 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  RESPONSABLEACADEMICO
+  EVALUADOR
+  ESTUDIANTE
+  TUTOR
+}
+
+enum Nivel {
+  PRINCIPIANTE
+  INTERMEDIO
+  AVANZADO
+}
+
+enum Estado {
+  INSCRIPCION
+  DESARROLLO
+  EVALUACION
+  MODIFICACIONES
+  FINALIZACION
+}
+
+enum Area {
+  MATEMATICA
+  FISICA
+  ROBOTICA
+  QUIMICA
+  PROGRAMACION
+}
+
+model User {
+  id                      String         @id @default(uuid())
+  name                    String
+  email                   String         @unique
+  passwordHash            String
+  role                    Role           @default(ESTUDIANTE)
+  activo                  Boolean        @default(true)
+  createdAt               DateTime       @default(now())
+  
+  ciudad                  String?         @db.VarChar(20)
+  documentoIdentidad      String?        @db.VarChar(20)
+
+  inscripciones           Inscripcion[]
+}
+
+model Competition {
+  id             String         @id @default(uuid())
+  nombre         String         @db.VarChar(45)
+  nivel          Nivel
+  estado         Estado         @default(INSCRIPCION)
+  area           Area
+  participantes  Int            @default(1)
+  fechaInicio    DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+
+  inscripciones  Inscripcion[]
+}
+
+model Inscripcion {
+  id                 String      @id @default(uuid())
+  fechaInscripcion   DateTime    @default(now())
+  gradoEscolaridad   String?     @db.VarChar(30)
+  tutorAcademico     String?     @db.VarChar(150)
+
+  userId             String
+  competitionId      String
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competition  Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([competitionId])
+}
