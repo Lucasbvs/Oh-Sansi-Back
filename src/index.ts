@@ -1,3 +1,4 @@
+// src/index.ts
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -7,10 +8,11 @@ import authRoutes from "./routes/auth";
 import competitionsRoutes from "./routes/competitions";
 import usersRoutes from "./routes/users";
 import adminUsersRoutes from "./routes/admin.users";
+import rolesRoutes from "./routes/roles";
 
 const app = express();
 
-// 1) middlewares base ANTES de las rutas
+// CORS
 app.use(cors({
   origin: ["http://localhost:3000"],
   credentials: true,
@@ -19,11 +21,12 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// 2) rutas (una sola vez cada una)
+// Rutas
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/competitions", competitionsRoutes);
 app.use("/api/admin/users", adminUsersRoutes);
+app.use("/api/roles", rolesRoutes);
 
 // health
 app.get("/api/health", (_req, res) => res.json({ ok: true }));

@@ -7,26 +7,22 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum Role {
-  ADMIN
-  RESPONSABLEACADEMICO
-  EVALUADOR
-  ESTUDIANTE
-  TUTOR
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique(map: "Role_name_key")
+  slug        String   @unique(map: "Role_slug_key")
+  isSystem    Boolean  @default(false)
+  permissions Json?
+  users       User[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum Nivel {
   PRINCIPIANTE
   INTERMEDIO
   AVANZADO
-}
-
-enum Estado {
-  INSCRIPCION
-  DESARROLLO
-  EVALUACION
-  MODIFICACIONES
-  FINALIZACION
 }
 
 enum Area {
@@ -37,42 +33,100 @@ enum Area {
   PROGRAMACION
 }
 
-model User {
-  id                      String         @id @default(uuid())
-  name                    String
-  email                   String         @unique
-  passwordHash            String
-  role                    Role           @default(ESTUDIANTE)
-  activo                  Boolean        @default(true)
-  createdAt               DateTime       @default(now())
-  
-  ciudad                  String?         @db.VarChar(20)
-  documentoIdentidad      String?        @db.VarChar(20)
+enum Ciudad {
+  PANDO
+  LAPAZ
+  COCHABAMBA
+  BENI
+  SANTACRUZ
+  ORURO
+  POTOSI
+  CHUQUISACA
+  TARIJA
+}
 
-  inscripciones           Inscripcion[]
+enum Modalidad {
+  PRESENCIAL
+  VIRTUAL
+}
+
+enum Etapa {
+  INSCRIPCION
+  DESARROLLO
+  EVALUACION
+  CORRECCION
+  PREMIACION
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  name               String
+  email              String    @unique
+  passwordHash       String
+  activo             Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+
+  ciudad             Ciudad    @default(COCHABAMBA)
+  documentoIdentidad String?   @db.VarChar(20)
+
+  roleId             String
+  role               Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  inscripciones      Inscripcion[]
 }
 
 model Competition {
-  id             String         @id @default(uuid())
-  nombre         String         @db.VarChar(45)
-  nivel          Nivel
-  estado         Estado         @default(INSCRIPCION)
-  area           Area
-  participantes  Int            @default(1)
-  fechaInicio    DateTime       @default(now())
-  createdAt      DateTime       @default(now())
+  id                String      @id @default(uuid())
+  nombre            String      @db.VarChar(45)
+  nivel             Nivel
+  area              Area
+  participantes     Int         @default(1)
+  modalidad         Modalidad   @default(PRESENCIAL)
+  formaCalificacion String      @db.VarChar(400)
+  fechaInicio       DateTime    @default(now())
+  estado            Boolean     @default(true)  // habilitado/deshabilitado (soft delete)
+  createdAt         DateTime    @default(now())
 
-  inscripciones  Inscripcion[]
+  fases             Fase[]
+  inscripciones     Inscripcion[]
+
+  /* === NUEVO: relación con etapas detalladas === */
+  etapas            EtapaCompetencia[]
+}
+
+model EtapaCompetencia {
+  id             String   @id @default(uuid())
+  etapa          Etapa
+  fechaInicio    DateTime
+  fechaFin       DateTime?
+
+  competitionId  String
+  competition    Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  @@index([competitionId])
+  @@index([etapa, competitionId])
+}
+
+model Fase {
+  id              String        @id @default(uuid())
+  nombre          String        @db.VarChar(80)
+  fechaInicio     DateTime
+  fechaFin        DateTime
+
+  competitionId   String
+  competition     Competition   @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  @@index([competitionId])
 }
 
 model Inscripcion {
-  id                 String      @id @default(uuid())
-  fechaInscripcion   DateTime    @default(now())
-  gradoEscolaridad   String?     @db.VarChar(30)
-  tutorAcademico     String?     @db.VarChar(150)
+  id               String      @id @default(uuid())
+  fechaInscripcion DateTime    @default(now())
+  gradoEscolaridad String?     @db.VarChar(30)
+  tutorAcademico   String?     @db.VarChar(150)
 
-  userId             String
-  competitionId      String
+  userId           String
+  competitionId    String
 
   user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   competition  Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)

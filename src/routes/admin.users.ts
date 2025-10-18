@@ -3,8 +3,7 @@ import { prisma } from "../lib/prisma";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { authRequired } from "../middleware/auth";
-import { requireRoles } from "../middleware/rbac";
-import { Role } from "@prisma/client";
+import { Ciudad } from "@prisma/client"; // 👈 importa el enum
 
 const router = Router();
 
@@ -12,22 +11,28 @@ const AdminCreateSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(6),
-  ciudad: z.string().max(50).optional().nullable(),
+  ciudad: z.nativeEnum(Ciudad), // 👈 usa enum, no string
   ci: z.string().max(20).optional().nullable(),
-  role: z.nativeEnum(Role), // 👈 cualquier rol del enum
+  roleId: z.string().uuid(),
 });
 
-/** POST /api/admin/users  (solo ADMIN) */
-router.post("/", authRequired, requireRoles(Role.ADMIN), async (req, res) => {
-  const parsed = AdminCreateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ ok: false, message: "Datos inválidos", errors: parsed.error.issues });
-  }
+router.post("/", authRequired, async (req: any, res) => {
+  if (req.user.roleSlug !== "ADMIN")
+    return res.status(403).json({ ok: false, message: "Solo ADMIN" });
 
-  const { name, email, password, ciudad, ci, role } = parsed.data;
+  const parsed = AdminCreateSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ ok: false, message: "Datos inválidos", errors: parsed.error.issues });
+
+  const { name, email, password, ciudad, ci, roleId } = parsed.data;
 
   const exists = await prisma.user.findUnique({ where: { email } });
-  if (exists) return res.status(409).json({ ok: false, message: "El correo ya está registrado" });
+  if (exists)
+    return res.status(409).json({ ok: false, message: "El correo ya está registrado" });
+
+  const role = await prisma.role.findUnique({ where: { id: roleId } });
+  if (!role)
+    return res.status(400).json({ ok: false, message: "Rol no válido" });
 
   const passwordHash = await bcrypt.hash(password, 10);
 
@@ -36,15 +41,21 @@ router.post("/", authRequired, requireRoles(Role.ADMIN), async (req, res) => {
       name,
       email,
       passwordHash,
-      role,
+      role: { connect: { id: roleId } },
       activo: true,
       documentoIdentidad: ci ?? null,
-      ciudad: ciudad ?? null,
+      ciudad, // 👈 ahora es del tipo enum Ciudad
     },
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: { select: { slug: true } },
+      createdAt: true,
+    },
   });
 
-  return res.status(201).json({ ok: true, user });
+  return res.status(201).json({ ok: true, user: { ...user, role: user.role?.slug ?? "UNKNOWN" } });
 });
 
 export default router;
