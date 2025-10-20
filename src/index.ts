@@ -9,6 +9,7 @@ import competitionsRoutes from "./routes/competitions";
 import usersRoutes from "./routes/users";
 import adminUsersRoutes from "./routes/admin.users";
 import rolesRoutes from "./routes/roles";
+import inscriptionsRoutes from "./routes/inscriptions";
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/competitions", competitionsRoutes);
 app.use("/api/admin/users", adminUsersRoutes);
 app.use("/api/roles", rolesRoutes);
+app.use("/api/inscriptions", inscriptionsRoutes);
 
 // health
 app.get("/api/health", (_req, res) => res.json({ ok: true }));

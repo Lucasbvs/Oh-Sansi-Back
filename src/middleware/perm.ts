@@ -5,19 +5,21 @@ import { prisma } from "../lib/prisma";
 export type PermKey =
   | "competitions.read" | "competitions.create" | "competitions.update" | "competitions.delete"
   | "users.read" | "users.create" | "users.update" | "users.delete"
+  | "inscriptions.read" | "inscriptions.create" | "inscriptions.delete"
   | "navbar.roles" | "navbar.usuarios" | "navbar.competencias" | "navbar.home";
 
 type Perms = {
   navbar?: Record<string, boolean>;
   competitions?: Partial<Record<"read"|"create"|"update"|"delete", boolean>>;
   users?: Partial<Record<"read"|"create"|"update"|"delete", boolean>>;
+  inscriptions?: Partial<Record<"read"|"create"|"delete", boolean>>;
 };
 
 export async function hasPermission(req: Request, perm: PermKey): Promise<boolean> {
   const user = (req as any).user;
   if (!user?.id) return false;
 
-  // ADMIN = full access
+  // ADMIN: full access
   if (user.roleSlug === "ADMIN") return true;
 
   let role = user.role ?? null;
@@ -37,6 +39,7 @@ export async function hasPermission(req: Request, perm: PermKey): Promise<boolea
   if (group === "navbar") return Boolean(p.navbar?.[action]);
   if (group === "competitions") return Boolean(p.competitions?.[action as keyof Perms["competitions"]]);
   if (group === "users") return Boolean(p.users?.[action as keyof Perms["users"]]);
+  if (group === "inscriptions") return Boolean(p.inscriptions?.[action as keyof Perms["inscriptions"]]);
   return false;
 }
 

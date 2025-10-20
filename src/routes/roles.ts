@@ -9,30 +9,29 @@ import { Prisma } from "@prisma/client";
 const router = Router();
 
 const PermsSchema = z.object({
-  navbar: z
-    .object({
-      home: z.boolean().optional(),
-      competencias: z.boolean().optional(),
-      usuarios: z.boolean().optional(),
-      roles: z.boolean().optional(), // reservado solo para ADMIN en UI
-    })
-    .optional(),
-  competitions: z
-    .object({
-      read: z.boolean().optional(),
-      create: z.boolean().optional(),
-      update: z.boolean().optional(),
-      delete: z.boolean().optional(),
-    })
-    .optional(),
-  users: z
-    .object({
-      read: z.boolean().optional(),
-      create: z.boolean().optional(),
-      update: z.boolean().optional(),
-      delete: z.boolean().optional(),
-    })
-    .optional(),
+  navbar: z.object({
+    home: z.boolean().optional(),
+    competencias: z.boolean().optional(),
+    usuarios: z.boolean().optional(),
+    roles: z.boolean().optional(),
+  }).optional(),
+  competitions: z.object({
+    read: z.boolean().optional(),
+    create: z.boolean().optional(),
+    update: z.boolean().optional(),
+    delete: z.boolean().optional(),
+  }).optional(),
+  users: z.object({
+    read: z.boolean().optional(),
+    create: z.boolean().optional(),
+    update: z.boolean().optional(),
+    delete: z.boolean().optional(),
+  }).optional(),
+  inscriptions: z.object({
+    read: z.boolean().optional(),   // ver "Mis competencias"
+    create: z.boolean().optional(), // inscribirse
+    delete: z.boolean().optional(), // cancelar inscripción
+  }).optional(),
 }).optional();
 
 const RoleBody = z.object({

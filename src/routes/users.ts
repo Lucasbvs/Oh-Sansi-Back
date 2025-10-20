@@ -1,4 +1,3 @@
-// src/routes/users.ts
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { authRequired } from "../middleware/auth";
@@ -23,7 +22,74 @@ function mapUser(u: any) {
   };
 }
 
-/** GET /api/users  (listar) */
+/* ===================== CREATE ===================== */
+
+const CreateUserSchema = z.object({
+  name: z.string().min(3, "Nombre muy corto"),
+  email: z.string().email("Correo inválido"),
+  password: z.string().min(6, "Mínimo 6 caracteres"),
+  // en tu esquema Prisma ciudad es enum; desde el front suele enviarse el valor del enum
+  ciudad: z.string().optional(),                // e.g. "COCHABAMBA"
+  ci: z.string().max(20).nullable().optional(),// documentoIdentidad
+  roleId: z.string().uuid("roleId inválido"),
+});
+
+router.post(
+  "/",
+  authRequired,
+  requirePerm("users.create"),
+  async (req, res) => {
+    const parsed = CreateUserSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ ok: false, message: "Datos inválidos", errors: parsed.error.issues });
+    }
+
+    const data = parsed.data;
+
+    // Validaciones de existencia
+    const [dupEmail, role] = await Promise.all([
+      prisma.user.findUnique({ where: { email: data.email } }),
+      prisma.role.findUnique({ where: { id: data.roleId } }),
+    ]);
+
+    if (dupEmail) {
+      return res.status(409).json({ ok: false, message: "Correo ya registrado" });
+    }
+    if (!role) {
+      return res.status(400).json({ ok: false, message: "Rol no válido" });
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+
+    const created = await prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        passwordHash,
+        ciudad: (data.ciudad as any) ?? undefined,
+        documentoIdentidad: data.ci ?? null,
+        role: { connect: { id: data.roleId } },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        documentoIdentidad: true,
+        ciudad: true,
+        roleId: true,
+        role: { select: { slug: true, isSystem: true } },
+      },
+    });
+
+    return res.status(201).json({ ok: true, user: mapUser(created) });
+  }
+);
+
+/* ===================== READ (LIST) ===================== */
+
 router.get(
   "/",
   authRequired,
@@ -32,12 +98,8 @@ router.get(
     const items = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-        documentoIdentidad: true,
-        ciudad: true,
+        id: true, name: true, email: true, createdAt: true,
+        documentoIdentidad: true, ciudad: true,
         roleId: true,
         role: { select: { slug: true, isSystem: true } },
       },
@@ -48,7 +110,8 @@ router.get(
   }
 );
 
-/** GET /api/users/:id  (obtener uno) */
+/* ===================== READ (ONE) ===================== */
+
 router.get(
   "/:id",
   authRequired,
@@ -57,12 +120,8 @@ router.get(
     const u = await prisma.user.findUnique({
       where: { id: req.params.id },
       select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-        documentoIdentidad: true,
-        ciudad: true,
+        id: true, name: true, email: true, createdAt: true,
+        documentoIdentidad: true, ciudad: true,
         roleId: true,
         role: { select: { slug: true, isSystem: true } },
       },
@@ -73,14 +132,15 @@ router.get(
   }
 );
 
-/** PUT /api/users/:id  (actualizar) */
+/* ===================== UPDATE ===================== */
+
 const UpdateSchema = z.object({
   name: z.string().min(2).optional(),
   email: z.string().email().optional(),
   ciudad: z.string().max(50).nullable().optional(),
   ci: z.string().max(20).nullable().optional(),
   roleId: z.string().uuid().optional(),
-  password: z.string().min(6).optional(), // si viene, cambia password
+  password: z.string().min(6).optional(),
 });
 
 router.put(
@@ -90,12 +150,13 @@ router.put(
   async (req, res) => {
     const parsed = UpdateSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ ok: false, message: "Datos inválidos", errors: parsed.error.issues });
+      return res
+        .status(400)
+        .json({ ok: false, message: "Datos inválidos", errors: parsed.error.issues });
     }
 
     const data = parsed.data;
 
-    // si intenta editarse a sí mismo a ADMIN/roles de sistema, no bloquear; los bloqueos van al eliminar
     const updateData: any = {
       name: data.name,
       email: data.email,
@@ -104,7 +165,6 @@ router.put(
     };
 
     if (data.roleId) {
-      // validar rol existe
       const role = await prisma.role.findUnique({ where: { id: data.roleId } });
       if (!role) return res.status(400).json({ ok: false, message: "Rol no válido" });
       updateData.role = { connect: { id: data.roleId } };
@@ -119,12 +179,8 @@ router.put(
         where: { id: req.params.id },
         data: updateData,
         select: {
-          id: true,
-          name: true,
-          email: true,
-          createdAt: true,
-          documentoIdentidad: true,
-          ciudad: true,
+          id: true, name: true, email: true, createdAt: true,
+          documentoIdentidad: true, ciudad: true,
           roleId: true,
           role: { select: { slug: true, isSystem: true } },
         },
@@ -137,13 +193,13 @@ router.put(
   }
 );
 
-/** DELETE /api/users/:id  (eliminar) */
+/* ===================== DELETE ===================== */
+
 router.delete(
   "/:id",
   authRequired,
   requirePerm("users.delete"),
   async (req: any, res) => {
-    // No permitir auto-eliminarse ni eliminar ADMIN/sistema
     if (req.user?.id === req.params.id) {
       return res.status(400).json({ ok: false, message: "No puedes eliminar tu propia cuenta" });
     }
