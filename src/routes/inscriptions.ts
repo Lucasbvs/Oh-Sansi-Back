@@ -17,7 +17,7 @@ router.get("/mis", authRequired, requirePerm("inscriptions.read"), async (req: a
 
     const items = await prisma.inscripcion.findMany({
       where: { userId: authUserId },
-      orderBy: { fechaInscripcion: "desc" },        // o createdAt
+      orderBy: { fechaInscripcion: "desc" },
       include: {
         competition: {
           select: {
@@ -29,19 +29,50 @@ router.get("/mis", authRequired, requirePerm("inscriptions.read"), async (req: a
             estado: true,
             participantes: true,
             createdAt: true,
+            etapas: {
+              select: {
+                etapa: true,
+                fechaInicio: true,
+                fechaFin: true,
+              },
+              orderBy: { fechaInicio: 'asc' }
+            },
           },
         },
       },
     });
 
+    // Función para calcular la etapa actual
+    const calcularEtapaActual = (etapas: any[]) => {
+      const ahora = new Date();
+      for (const etapa of etapas) {
+        const inicio = new Date(etapa.fechaInicio);
+        const fin = etapa.fechaFin ? new Date(etapa.fechaFin) : null;
+        
+        if (inicio <= ahora && (!fin || fin >= ahora)) {
+          return etapa.etapa;
+        }
+      }
+      return "FINALIZADA";
+    };
+
     // Shape compatible con el front
     const data = items.map((i) => ({
-      id: i.id,                                 // id de la inscripción
-      competition: i.competition,
+      id: i.id,
+      competition: {
+        ...i.competition,
+        etapaActual: calcularEtapaActual(i.competition.etapas || [])
+      },
+      fechaInscripcion: i.fechaInscripcion,
+      createdAt: i.createdAt,
     }));
 
     // Extra: compatibilidad por si en algún lado consumías como arreglo de competitions
-    return res.json({ ok: true, items: data, competitions: data.map(d => d.competition) });
+    return res.json({ 
+      ok: true, 
+      items: data, 
+      competitions: data.map(d => d.competition) 
+    });
   }
 );
 

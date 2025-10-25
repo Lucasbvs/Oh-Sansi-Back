@@ -133,6 +133,9 @@ router.get("/me", authRequired, async (req: any, res) => {
         id: true,
         name: true,
         email: true,
+        documentoIdentidad: true,  // ✅ AGREGADO
+        ciudad: true,              // ✅ AGREGADO
+        activo: true,              // ✅ AGREGADO
         role: { select: { id: true, name: true, slug: true, permissions: true } },
       },
     });
@@ -144,6 +147,9 @@ router.get("/me", authRequired, async (req: any, res) => {
         id: me.id,
         name: me.name,
         email: me.email,
+        documentoIdentidad: me.documentoIdentidad,  // ✅ AGREGADO
+        ciudad: me.ciudad,                          // ✅ AGREGADO
+        activo: me.activo,                          // ✅ AGREGADO
         role: me.role?.slug ?? "UNKNOWN",
         roleInfo: me.role,
       },
