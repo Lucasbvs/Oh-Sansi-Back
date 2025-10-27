@@ -236,7 +236,7 @@ router.delete("/:id", authRequired, requirePerm("competitions.delete"), async (r
   }
 });
 
-/* ========== NUEVO: Inscribirse ========== */
+
 router.post("/:id/inscribirse", authRequired, requirePerm("inscriptions.create"), async (req: any, res) => {
   const comp = await prisma.competition.findUnique({
     where: { id: req.params.id },
@@ -249,6 +249,23 @@ router.post("/:id/inscribirse", authRequired, requirePerm("inscriptions.create")
     return res.status(409).json({ ok: false, message: "Ya estás inscrito en esta competencia" });
   }
 
+  // NUEVA VALIDACIÓN: Verificar que el estudiante tiene tutor asignado
+  const estudiante = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { 
+      tutorId: true, 
+      role: { select: { slug: true } }
+    }
+  });
+
+  // Solo validar tutor para estudiantes
+  if (estudiante?.role?.slug === "ESTUDIANTE" && !estudiante.tutorId) {
+    return res.status(400).json({ 
+      ok: false, 
+      message: "No puedes inscribirte sin tener un tutor asignado. Por favor, asigna un tutor primero desde la sección de Tutores." 
+    });
+  }
+
   // verificar etapa INSCRIPCION vigente (si existe)
   const insc = comp.etapas.find(e => e.etapa === "INSCRIPCION");
   if (insc) {
@@ -257,13 +274,16 @@ router.post("/:id/inscribirse", authRequired, requirePerm("inscriptions.create")
   }
 
   await prisma.inscripcion.create({
-    data: { userId: req.user.id, competitionId: comp.id }
+    data: {
+      userId: req.user.id,
+      competitionId: comp.id
+    }
   });
 
   res.json({ ok: true, message: "Inscripción realizada" });
 });
 
-/* ========== NUEVO: Desinscribirse ========== */
+
 router.delete(
   "/:id/desinscribirse",
   authRequired,
@@ -296,6 +316,5 @@ router.delete(
     }
   }
 );
-
 
 export default router;

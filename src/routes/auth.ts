@@ -1,4 +1,3 @@
-// src/routes/auth.ts
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import bcrypt from "bcrypt";
@@ -19,9 +18,9 @@ const RegisterSchema = z.object({
   name: z.string().min(2, "Nombre muy corto"),
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-  ciudad: z.nativeEnum(Ciudad).optional(),  // 👈 enum opcional
+  ciudad: z.nativeEnum(Ciudad).optional(),
   ci: z.string().max(20).optional().nullable(),
-  roleSlug: z.enum(["ESTUDIANTE", "TUTOR"]).optional(), // registro público
+  roleSlug: z.enum(["ESTUDIANTE", "TUTOR"]).optional(),
 });
 
 /* Helpers */
@@ -63,7 +62,7 @@ router.post("/login", async (req, res) => {
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return res.status(401).json({ ok: false, message: "Credenciales inválidas" });
 
-  const roleSlug = user.role?.slug ?? "UNKNOWN";
+  const roleSlug = (user as any).role?.slug ?? "UNKNOWN";
   const token = signToken({ id: user.id, email: user.email, name: user.name, roleSlug });
 
   res.json({
@@ -73,7 +72,7 @@ router.post("/login", async (req, res) => {
   });
 });
 
-// POST /api/auth/register  (público: sólo ESTUDIANTE o TUTOR)
+// POST /api/auth/register
 router.post("/register", async (req, res) => {
   const parsed = RegisterSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -92,7 +91,6 @@ router.post("/register", async (req, res) => {
     const role = await prisma.role.findUnique({ where: { slug } });
     if (!role) return res.status(500).json({ ok:false, message:"Rol por defecto no encontrado" });
 
-    // Si no hay default en Prisma, definimos uno aquí para no mandar null
     const safeCiudad: Ciudad = ciudad ?? Ciudad.COCHABAMBA;
 
     const created = await prisma.user.create({
@@ -103,12 +101,11 @@ router.post("/register", async (req, res) => {
         role: { connect: { id: role.id } },
         activo: true,
         documentoIdentidad: ci ?? null,
-        ciudad: safeCiudad, // 👈 enum, no null
+        ciudad: safeCiudad,
       },
-      select: { id: true, name: true, email: true, role: { select: { slug: true } } },
     });
 
-    const roleSlugSaved = created.role?.slug ?? "UNKNOWN";
+    const roleSlugSaved = slug;
     const token = signToken({ id: created.id, email: created.email, name: created.name, roleSlug: roleSlugSaved });
 
     res.status(201).json({
@@ -129,16 +126,25 @@ router.get("/me", authRequired, async (req: any, res) => {
   try {
     const me = await prisma.user.findUnique({
       where: { id: req.user?.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        documentoIdentidad: true,  // ✅ AGREGADO
-        ciudad: true,              // ✅ AGREGADO
-        activo: true,              // ✅ AGREGADO
-        role: { select: { id: true, name: true, slug: true, permissions: true } },
-      },
+      include: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            permissions: true
+          }
+        },
+        tutor: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
     });
+
     if (!me) return res.status(404).json({ ok: false, message: "Usuario no encontrado" });
 
     res.json({
@@ -147,14 +153,16 @@ router.get("/me", authRequired, async (req: any, res) => {
         id: me.id,
         name: me.name,
         email: me.email,
-        documentoIdentidad: me.documentoIdentidad,  // ✅ AGREGADO
-        ciudad: me.ciudad,                          // ✅ AGREGADO
-        activo: me.activo,                          // ✅ AGREGADO
+        documentoIdentidad: me.documentoIdentidad,
+        ciudad: me.ciudad,
+        activo: me.activo,
+        tutorId: me.tutorId,
         role: me.role?.slug ?? "UNKNOWN",
         roleInfo: me.role,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("Error en /me:", error);
     res.status(500).json({ ok: false, message: "Error interno del servidor" });
   }
 });

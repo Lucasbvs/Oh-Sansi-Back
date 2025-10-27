@@ -1,4 +1,4 @@
-// src/index.ts
+// src/index.ts 
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -10,6 +10,7 @@ import usersRoutes from "./routes/users";
 import adminUsersRoutes from "./routes/admin.users";
 import rolesRoutes from "./routes/roles";
 import inscriptionsRoutes from "./routes/inscriptions";
+import tutoresRoutes from "./routes/tutores"; 
 
 const app = express();
 
@@ -29,11 +30,12 @@ app.use("/api/competitions", competitionsRoutes);
 app.use("/api/admin/users", adminUsersRoutes);
 app.use("/api/roles", rolesRoutes);
 app.use("/api/inscriptions", inscriptionsRoutes);
+app.use("/api/tutores", tutoresRoutes); // NUEVA RUTA
 
 // health
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-// 404 JSON
+
 app.use((_req, res) => res.status(404).json({ ok:false, message:"Not Found" }));
 
 const PORT = process.env.PORT || 4000;

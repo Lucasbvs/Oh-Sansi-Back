@@ -72,6 +72,13 @@ model User {
   roleId             String
   role               Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
+
+  estudiantesTutorados User[]   @relation("TutorEstudiante")
+
+  
+  tutorId            String?
+  tutor              User?      @relation("TutorEstudiante", fields: [tutorId], references: [id], onDelete: SetNull)
+
   inscripciones      Inscripcion[]
 }
 
@@ -84,13 +91,11 @@ model Competition {
   modalidad         Modalidad   @default(PRESENCIAL)
   formaCalificacion String      @db.VarChar(400)
   fechaInicio       DateTime    @default(now())
-  estado            Boolean     @default(true)  // habilitado/deshabilitado (soft delete)
+  estado            Boolean     @default(true)
   createdAt         DateTime    @default(now())
 
   fases             Fase[]
   inscripciones     Inscripcion[]
-
-  /* === NUEVO: relación con etapas detalladas === */
   etapas            EtapaCompetencia[]
 }
 
@@ -123,7 +128,6 @@ model Inscripcion {
   id               String      @id @default(uuid())
   fechaInscripcion DateTime    @default(now())
   gradoEscolaridad String?     @db.VarChar(30)
-  tutorAcademico   String?     @db.VarChar(150)
 
   userId           String
   competitionId    String

@@ -8,8 +8,7 @@ const router = Router();
 /** Devuelve las competencias en las que está inscrito el usuario actual */
 router.get("/mis", authRequired, requirePerm("inscriptions.read"), async (req: any, res) => {
   
-    const authUserId =
-      req.user?.id ?? req.user?.userId ?? req.user?.sub ?? null;
+    const authUserId = req.user?.id ?? req.user?.userId ?? req.user?.sub ?? null;
 
     if (!authUserId) {
       return res.status(401).json({ ok: false, message: "Usuario no autenticado" });
@@ -67,7 +66,6 @@ router.get("/mis", authRequired, requirePerm("inscriptions.read"), async (req: a
       createdAt: i.createdAt,
     }));
 
-    // Extra: compatibilidad por si en algún lado consumías como arreglo de competitions
     return res.json({ 
       ok: true, 
       items: data, 
