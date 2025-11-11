@@ -14,6 +14,7 @@ const PermsSchema = z.object({
     competencias: z.boolean().optional(),
     usuarios: z.boolean().optional(),
     roles: z.boolean().optional(),
+    tutorias: z.boolean().optional(), // ✅ NUEVO
   }).optional(),
   competitions: z.object({
     read: z.boolean().optional(),
@@ -31,6 +32,11 @@ const PermsSchema = z.object({
     read: z.boolean().optional(),   // ver "Mis competencias"
     create: z.boolean().optional(), // inscribirse
     delete: z.boolean().optional(), // cancelar inscripción
+  }).optional(),
+  // ✅ NUEVO: Permisos de tutorías
+  tutorias: z.object({
+    read: z.boolean().optional(),    // Ver listado de tutorías
+    manage: z.boolean().optional(),  // Gestionar asignaciones (solo admin)
   }).optional(),
 }).optional();
 
