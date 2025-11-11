@@ -65,6 +65,42 @@ function validarSolapes(
   return null;
 }
 
+
+function validarFasesEnDesarrollo(
+  fases: { fechaInicio: Date; fechaFin: Date; nombre: string }[],
+  etapas: { etapa: string; fechaInicio: Date; fechaFin: Date | null }[]
+) {
+  
+  const etapaDesarrollo = etapas.find(e => e.etapa === "DESARROLLO");
+  
+  if (!etapaDesarrollo) {
+    return "No se encontró la etapa de DESARROLLO";
+  }
+
+  if (!etapaDesarrollo.fechaFin) {
+    return "La etapa de DESARROLLO debe tener fecha de fin para validar las fases";
+  }
+
+  
+  for (const fase of fases) {
+    
+    if (fase.fechaFin < fase.fechaInicio) {
+      return `La fase "${fase.nombre}" tiene fecha de fin (${fase.fechaFin.toLocaleDateString()}) anterior a la fecha de inicio (${fase.fechaInicio.toLocaleDateString()})`;
+    }
+
+    
+    if (fase.fechaInicio < etapaDesarrollo.fechaInicio) {
+      return `La fase "${fase.nombre}" inicia (${fase.fechaInicio.toLocaleDateString()}) antes del inicio de la etapa de DESARROLLO (${etapaDesarrollo.fechaInicio.toLocaleDateString()})`;
+    }
+    
+    if (fase.fechaFin > etapaDesarrollo.fechaFin) {
+      return `La fase "${fase.nombre}" finaliza (${fase.fechaFin.toLocaleDateString()}) después del fin de la etapa de DESARROLLO (${etapaDesarrollo.fechaFin.toLocaleDateString()})`;
+    }
+  }
+
+  return null;
+}
+
 function ahora() { return new Date(); }
 function isBetween(d: Date, ini: Date, fin?: Date | null) {
   const t = d.getTime(), a = ini.getTime(), b = fin ? fin.getTime() : Number.POSITIVE_INFINITY;
@@ -81,8 +117,16 @@ router.post("/", authRequired, requirePerm("competitions.create"), async (req, r
 
   const data = parsed.data;
 
+  // Validación existente de solapamiento
   const err = validarSolapes(data.fases.map((f) => ({ ...f, nombre: f.nombre })));
   if (err) return res.status(400).json({ ok: false, message: err });
+
+  
+  const errFasesDesarrollo = validarFasesEnDesarrollo(
+    data.fases.map((f) => ({ ...f, nombre: f.nombre })),
+    data.etapas
+  );
+  if (errFasesDesarrollo) return res.status(400).json({ ok: false, message: errFasesDesarrollo });
 
   const competition = await prisma.competition.create({
     data: {
@@ -132,14 +176,13 @@ router.get("/", authRequired, requirePerm("competitions.read"), async (req: any,
   res.json({ ok: true, competitions });
 });
 
-// Obtener por id (detalle) — TODOS los roles con competitions.read
+
 router.get("/:id", authRequired, requirePerm("competitions.read"), async (req: any, res) => {
   const c = await prisma.competition.findUnique({
     where: { id: req.params.id },
     include: {
       fases: true,
       etapas: true,
-      // Saber si el usuario actual ya está inscrito:
       inscripciones: { where: { userId: req.user.id }, select: { id: true } },
     },
   });
@@ -154,7 +197,7 @@ router.get("/:id", authRequired, requirePerm("competitions.read"), async (req: a
   });
 });
 
-// Actualizar (igual que antes)
+// Actualizar
 router.put("/:id", authRequired, requirePerm("competitions.update"), async (req, res) => {
   const parsed = CompetitionUpdateBody.safeParse(req.body);
   if (!parsed.success)
@@ -163,6 +206,17 @@ router.put("/:id", authRequired, requirePerm("competitions.update"), async (req,
 
   const exists = await prisma.competition.findUnique({ where: { id: req.params.id } });
   if (!exists) return res.status(404).json({ ok: false, message: "No encontrado" });
+
+  if (data.fases && data.etapas) {
+    const err = validarSolapes(data.fases.map((f) => ({ ...f, nombre: f.nombre })));
+    if (err) return res.status(400).json({ ok: false, message: err });
+
+    const errFasesDesarrollo = validarFasesEnDesarrollo(
+      data.fases.map((f) => ({ ...f, nombre: f.nombre })),
+      data.etapas
+    );
+    if (errFasesDesarrollo) return res.status(400).json({ ok: false, message: errFasesDesarrollo });
+  }
 
   const updated = await prisma.competition.update({
     where: { id: req.params.id },
@@ -181,6 +235,15 @@ router.put("/:id", authRequired, requirePerm("competitions.update"), async (req,
   if (data.fases) {
     const err = validarSolapes(data.fases.map((f) => ({ ...f, nombre: f.nombre })));
     if (err) return res.status(400).json({ ok: false, message: err });
+
+
+    if (data.etapas) {
+      const errFasesDesarrollo = validarFasesEnDesarrollo(
+        data.fases.map((f) => ({ ...f, nombre: f.nombre })),
+        data.etapas
+      );
+      if (errFasesDesarrollo) return res.status(400).json({ ok: false, message: errFasesDesarrollo });
+    }
 
     await prisma.fase.deleteMany({ where: { competitionId: updated.id } });
     await prisma.fase.createMany({
@@ -207,7 +270,7 @@ router.put("/:id", authRequired, requirePerm("competitions.update"), async (req,
   res.json({ ok: true, competition: final });
 });
 
-// Cambiar estado (igual)
+// Cambiar estado 
 router.put("/:id/estado", authRequired, async (req: any, res) => {
   if (req.user.roleSlug !== "ADMIN")
     return res.status(403).json({ ok: false, message: "Solo ADMIN" });
@@ -222,7 +285,7 @@ router.put("/:id/estado", authRequired, async (req: any, res) => {
   res.json({ ok: true, competition: updated });
 });
 
-// Eliminar (igual)
+// Eliminar 
 router.delete("/:id", authRequired, requirePerm("competitions.delete"), async (req: any, res) => {
   const comp = await prisma.competition.findUnique({ where: { id: req.params.id } });
   if (!comp) return res.status(404).json({ ok: false, message: "No encontrado" });
@@ -244,12 +307,12 @@ router.post("/:id/inscribirse", authRequired, requirePerm("inscriptions.create")
   });
   if (!comp || !comp.estado) return res.status(404).json({ ok: false, message: "Competencia no disponible" });
 
-  // ¿ya inscrito?
+  
   if ((comp.inscripciones?.length ?? 0) > 0) {
     return res.status(409).json({ ok: false, message: "Ya estás inscrito en esta competencia" });
   }
 
-  // NUEVA VALIDACIÓN: Verificar que el estudiante tiene tutor asignado
+
   const estudiante = await prisma.user.findUnique({
     where: { id: req.user.id },
     select: { 
@@ -258,7 +321,7 @@ router.post("/:id/inscribirse", authRequired, requirePerm("inscriptions.create")
     }
   });
 
-  // Solo validar tutor para estudiantes
+
   if (estudiante?.role?.slug === "ESTUDIANTE" && !estudiante.tutorId) {
     return res.status(400).json({ 
       ok: false, 
@@ -266,7 +329,7 @@ router.post("/:id/inscribirse", authRequired, requirePerm("inscriptions.create")
     });
   }
 
-  // verificar etapa INSCRIPCION vigente (si existe)
+ 
   const insc = comp.etapas.find(e => e.etapa === "INSCRIPCION");
   if (insc) {
     const dentro = isBetween(ahora(), insc.fechaInicio, insc.fechaFin ?? undefined);
@@ -297,7 +360,7 @@ router.delete(
         return res.status(401).json({ ok: false, message: "Usuario no autenticado" });
       }
 
-      // Busca la inscripción del usuario en esta competencia
+
       const insc = await prisma.inscripcion.findFirst({
         where: { userId: authUserId, competitionId },
         select: { id: true },
