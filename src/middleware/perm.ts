@@ -1,4 +1,3 @@
-// src/middleware/perm.ts
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 
@@ -6,6 +5,7 @@ export type PermKey =
   | "competitions.read" | "competitions.create" | "competitions.update" | "competitions.delete"
   | "users.read" | "users.create" | "users.update" | "users.delete"
   | "inscriptions.read" | "inscriptions.create" | "inscriptions.delete"
+  | "evaluaciones.read" | "evaluaciones.create" | "evaluaciones.update" | "evaluaciones.delete"  // ← AGREGAR
   | "navbar.roles" | "navbar.usuarios" | "navbar.competencias" | "navbar.home";
 
 type Perms = {
@@ -13,6 +13,7 @@ type Perms = {
   competitions?: Partial<Record<"read"|"create"|"update"|"delete", boolean>>;
   users?: Partial<Record<"read"|"create"|"update"|"delete", boolean>>;
   inscriptions?: Partial<Record<"read"|"create"|"delete", boolean>>;
+  evaluaciones?: Partial<Record<"read"|"create"|"update"|"delete", boolean>>;  // ← AGREGAR
 };
 
 export async function hasPermission(req: Request, perm: PermKey): Promise<boolean> {
@@ -40,6 +41,7 @@ export async function hasPermission(req: Request, perm: PermKey): Promise<boolea
   if (group === "competitions") return Boolean(p.competitions?.[action as keyof Perms["competitions"]]);
   if (group === "users") return Boolean(p.users?.[action as keyof Perms["users"]]);
   if (group === "inscriptions") return Boolean(p.inscriptions?.[action as keyof Perms["inscriptions"]]);
+  if (group === "evaluaciones") return Boolean(p.evaluaciones?.[action as keyof Perms["evaluaciones"]]);  // ← AGREGAR
   return false;
 }
 

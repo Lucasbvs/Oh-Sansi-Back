@@ -133,14 +133,18 @@ router.get("/", authRequired, requirePerm("competitions.read"), async (req: any,
 });
 
 // Obtener por id (detalle) — TODOS los roles con competitions.read
+// En la ruta GET /:id
 router.get("/:id", authRequired, requirePerm("competitions.read"), async (req: any, res) => {
   const c = await prisma.competition.findUnique({
     where: { id: req.params.id },
     include: {
       fases: true,
       etapas: true,
-      // Saber si el usuario actual ya está inscrito:
       inscripciones: { where: { userId: req.user.id }, select: { id: true } },
+      evaluadoresAsignados: { 
+        where: { evaluadorId: req.user.id }, 
+        select: { id: true } 
+      },
     },
   });
   if (!c) return res.status(404).json({ ok: false, message: "No encontrado" });
@@ -150,6 +154,7 @@ router.get("/:id", authRequired, requirePerm("competitions.read"), async (req: a
     competition: {
       ...c,
       yaInscrito: (c.inscripciones?.length ?? 0) > 0,
+      yaAsignadoEvaluador: (c.evaluadoresAsignados?.length ?? 0) > 0,
     },
   });
 });

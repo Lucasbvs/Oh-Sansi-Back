@@ -80,6 +80,9 @@ model User {
   tutor              User?      @relation("TutorEstudiante", fields: [tutorId], references: [id], onDelete: SetNull)
 
   inscripciones      Inscripcion[]
+  evaluaciones          Evaluacion[]           @relation("EvaluadorEvaluaciones")
+  misEvaluaciones       Evaluacion[]           @relation("EstudianteEvaluaciones")
+  competenciasEvaluador EvaluadorCompetencia[] @relation("EvaluadorCompetencias")
 }
 
 model Competition {
@@ -97,6 +100,8 @@ model Competition {
   fases             Fase[]
   inscripciones     Inscripcion[]
   etapas            EtapaCompetencia[]
+  evaluaciones          Evaluacion[]
+  evaluadoresAsignados  EvaluadorCompetencia[]
 }
 
 model EtapaCompetencia {
@@ -136,5 +141,41 @@ model Inscripcion {
   competition  Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([competitionId])
+}
+
+model Evaluacion {
+  id                String      @id @default(uuid())
+  calificacion      Float?      // Nota numérica
+  detalles          String?     @db.Text
+  fechaEvaluacion   DateTime    @default(now())
+  actualizado       DateTime    @updatedAt
+  
+  evaluadorId       String
+  evaluador         User        @relation("EvaluadorEvaluaciones", fields: [evaluadorId], references: [id], onDelete: Cascade)
+  
+  estudianteId      String
+  estudiante        User        @relation("EstudianteEvaluaciones", fields: [estudianteId], references: [id], onDelete: Cascade)
+  
+  competitionId     String
+  competition       Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  
+  @@unique([evaluadorId, estudianteId, competitionId])
+  @@index([evaluadorId, competitionId])
+  @@index([estudianteId, competitionId])
+}
+
+model EvaluadorCompetencia {
+  id              String      @id @default(uuid())
+  fechaAsignacion DateTime    @default(now())
+  
+  evaluadorId     String
+  evaluador       User        @relation("EvaluadorCompetencias", fields: [evaluadorId], references: [id], onDelete: Cascade)
+  
+  competitionId   String
+  competition     Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  
+  @@unique([evaluadorId, competitionId])
+  @@index([evaluadorId])
   @@index([competitionId])
 }

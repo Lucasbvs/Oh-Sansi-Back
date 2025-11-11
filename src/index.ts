@@ -1,4 +1,4 @@
-// src/index.ts 
+// src/index.ts
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -10,7 +10,8 @@ import usersRoutes from "./routes/users";
 import adminUsersRoutes from "./routes/admin.users";
 import rolesRoutes from "./routes/roles";
 import inscriptionsRoutes from "./routes/inscriptions";
-import tutoresRoutes from "./routes/tutores"; 
+import tutoresRoutes from "./routes/tutores";
+import evaluacionesRoutes from "./routes/evaluaciones";  // ← AGREGAR
 
 const app = express();
 
@@ -30,11 +31,11 @@ app.use("/api/competitions", competitionsRoutes);
 app.use("/api/admin/users", adminUsersRoutes);
 app.use("/api/roles", rolesRoutes);
 app.use("/api/inscriptions", inscriptionsRoutes);
-app.use("/api/tutores", tutoresRoutes); // NUEVA RUTA
+app.use("/api/tutores", tutoresRoutes);
+app.use("/api/evaluaciones", evaluacionesRoutes);  // ← AGREGAR
 
 // health
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
-
 
 app.use((_req, res) => res.status(404).json({ ok:false, message:"Not Found" }));
 
