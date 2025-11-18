@@ -1,3 +1,4 @@
+// src/routes/tutores.ts
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { authRequired } from "../middleware/auth";
@@ -5,7 +6,7 @@ import { Prisma } from "@prisma/client";
 
 const router = Router();
 
-
+// Obtener todos los tutores
 router.get("/", authRequired, async (req: any, res) => {
   try {
     console.log("🔍 Buscando tutores (usuarios con rol TUTOR)...");
@@ -50,11 +51,11 @@ router.get("/", authRequired, async (req: any, res) => {
   }
 });
 
+// Obtener estudiantes del tutor
 router.get("/mis-estudiantes", authRequired, async (req: any, res) => {
   try {
     const tutorId = req.user.id;
 
-    // Verificar que el usuario es tutor
     const tutor = await prisma.user.findUnique({
       where: { id: tutorId },
       include: { role: true }
@@ -116,17 +117,13 @@ router.get("/mis-estudiantes", authRequired, async (req: any, res) => {
   }
 });
 
+// ✅ ASIGNAR TUTOR - CORREGIDO
 router.post("/:tutorId/asignar", authRequired, async (req: any, res) => {
   try {
     const { tutorId } = req.params;
     const estudianteId = req.user.id;
 
     console.log(`🎯 Intentando asignar tutor ${tutorId} a estudiante ${estudianteId}`);
-    console.log(`🔍 Datos del usuario:`, {
-      id: req.user.id,
-      email: req.user.email,
-      roleSlug: req.user.roleSlug
-    });
 
     // Verificar que el usuario es estudiante
     const estudiante = await prisma.user.findUnique({
@@ -142,31 +139,25 @@ router.post("/:tutorId/asignar", authRequired, async (req: any, res) => {
       }
     });
 
-    console.log(`🔍 Estudiante encontrado:`, estudiante);
-
     if (!estudiante) {
-      console.log(`❌ Estudiante no encontrado: ${estudianteId}`);
       return res.status(404).json({ ok: false, message: "Estudiante no encontrado" });
     }
 
     if (!estudiante.role || estudiante.role?.slug !== "ESTUDIANTE") {
-      console.log(`❌ Usuario no es estudiante. Rol actual: ${estudiante.role?.slug}`);
       return res.status(403).json({ 
         ok: false, 
         message: "Solo los estudiantes pueden asignarse tutores" 
       });
     }
 
-    // Verificar si ya tiene tutor asignado
     if (estudiante.tutorId) {
-      console.log(`❌ Estudiante ya tiene tutor asignado: ${estudiante.tutorId}`);
       return res.status(400).json({ 
         ok: false, 
         message: "Ya tienes un tutor asignado. Debes desasignarlo primero." 
       });
     }
 
-    // Verificar que el tutor existe y es realmente un TUTOR
+    // Verificar que el tutor existe
     const tutor = await prisma.user.findUnique({
       where: { 
         id: tutorId,
@@ -177,22 +168,16 @@ router.post("/:tutorId/asignar", authRequired, async (req: any, res) => {
       }
     });
 
-    console.log(`🔍 Tutor encontrado:`, tutor);
-
     if (!tutor) {
-      console.log(`❌ Tutor no encontrado: ${tutorId}`);
       return res.status(404).json({ ok: false, message: "Tutor no encontrado" });
     }
 
     if (!tutor.role || tutor.role?.slug !== "TUTOR") {
-      console.log(`❌ Usuario no es tutor. Rol actual: ${tutor.role?.slug}`);
       return res.status(400).json({ 
         ok: false, 
         message: "El usuario seleccionado no es un tutor válido" 
       });
     }
-
-    console.log(`✅ Tutor válido encontrado: ${tutor.name}, Estudiante: ${estudiante.name}`);
 
     // Asignar tutor al estudiante
     const estudianteActualizado = await prisma.user.update({
@@ -211,8 +196,7 @@ router.post("/:tutorId/asignar", authRequired, async (req: any, res) => {
       }
     });
 
-    console.log(`✅ Tutor asignado correctamente: ${tutor.name} -> ${estudiante.name}`);
-    console.log(`✅ Estudiante actualizado:`, estudianteActualizado);
+    console.log(`✅ Tutor asignado correctamente`);
 
     res.json({ 
       ok: true, 
@@ -227,40 +211,33 @@ router.post("/:tutorId/asignar", authRequired, async (req: any, res) => {
   } catch (error) {
     console.error("❌ Error asignando tutor:", error);
     
-    // Manejo específico de errores de Prisma
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2003') {
-        console.log(`❌ Error P2003: Foreign key constraint - Tutor no existe`);
         return res.status(400).json({ 
           ok: false, 
           message: "Error: El tutor no existe o no es válido" 
         });
       }
       if (error.code === 'P2025') {
-        console.log(`❌ Error P2025: Estudiante no encontrado`);
         return res.status(404).json({ 
           ok: false, 
           message: "Estudiante no encontrado" 
         });
       }
-      console.log(`❌ Código de error Prisma: ${error.code}`);
     }
     
     res.status(500).json({ 
       ok: false, 
-      message: "Error interno del servidor al asignar tutor",
-      error: error.message 
+      message: "Error interno del servidor al asignar tutor"
     });
   }
 });
 
+// Desasignar tutor
 router.delete("/desasignar", authRequired, async (req: any, res) => {
   try {
     const estudianteId = req.user.id;
 
-    console.log(`🗑️ Intentando desasignar tutor del estudiante: ${estudianteId}`);
-
-    // Verificar que el usuario es estudiante
     const estudiante = await prisma.user.findUnique({
       where: { id: estudianteId },
       include: { 
@@ -277,7 +254,6 @@ router.delete("/desasignar", authRequired, async (req: any, res) => {
       return res.status(403).json({ ok: false, message: "Solo los estudiantes pueden desasignarse tutores" });
     }
 
-    // Verificar que tiene un tutor asignado
     if (!estudiante.tutorId) {
       return res.status(400).json({ 
         ok: false, 
@@ -290,8 +266,6 @@ router.delete("/desasignar", authRequired, async (req: any, res) => {
       data: { tutorId: null }
     });
 
-    console.log(`✅ Tutor desasignado correctamente del estudiante: ${estudiante.name}`);
-
     res.json({ 
       ok: true, 
       message: "Tutor desasignado correctamente" 
@@ -300,12 +274,12 @@ router.delete("/desasignar", authRequired, async (req: any, res) => {
     console.error("Error desasignando tutor:", error);
     res.status(500).json({ 
       ok: false, 
-      message: "Error interno del servidor",
-      error: error.message 
+      message: "Error interno del servidor"
     });
   }
 });
 
+// Obtener mi tutor
 router.get("/mi-tutor", authRequired, async (req: any, res) => {
   try {
     const estudianteId = req.user.id;
@@ -343,25 +317,17 @@ router.get("/mi-tutor", authRequired, async (req: any, res) => {
   }
 });
 
-
+// Lectura de asignaciones (Admin, Tutor, Estudiante)
 router.get("/asignaciones-lectura", authRequired, async (req: any, res) => {
   try {
-
     const userRole = req.user.role;
     const userPerms = userRole?.permissions;
     const canReadTutorias = userPerms?.tutorias?.read;
-    
-    console.log("🔍 Verificando permisos para:", req.user.email);
-    console.log("🔍 Rol del usuario:", req.user.roleSlug);
-    console.log("🔍 Permisos del rol:", userPerms);
-    console.log("🔍 Permiso tutorias.read:", canReadTutorias);
     
     const isAllowed = req.user.roleSlug === "ADMIN" || 
                      req.user.roleSlug === "TUTOR" || 
                      req.user.roleSlug === "ESTUDIANTE" || 
                      canReadTutorias;
-
-    console.log("🔍 Acceso permitido:", isAllowed);
 
     if (!isAllowed) {
       return res.status(403).json({ ok: false, message: "No tiene permisos para ver las asignaciones de tutorías" });

@@ -7,6 +7,64 @@ import { z } from "zod";
 
 const router = Router();
 
+// Obtener competencias asignadas al evaluador
+router.get(
+  "/mis-competencias",
+  authRequired,
+  requirePerm("evaluaciones.read"),
+  async (req: any, res) => {
+    try {
+      console.log("🔍 [DEBUG] Usuario en evaluaciones:", req.user);
+      
+      const evaluadorId = req.user.id;
+
+      const asignaciones = await prisma.evaluadorCompetencia.findMany({
+        where: { evaluadorId },
+        include: {
+          competition: {
+            include: {
+              etapas: {
+                select: {
+                  etapa: true,
+                  fechaInicio: true,
+                  fechaFin: true,
+                },
+                orderBy: { fechaInicio: "asc" },
+              },
+              _count: {
+                select: {
+                  inscripciones: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { fechaAsignacion: "desc" },
+      });
+
+      console.log("📊 [DEBUG] Asignaciones encontradas:", asignaciones.length);
+
+      res.json({
+        ok: true,
+        competencias: asignaciones.map((a) => ({
+          id: a.competition.id,
+          nombre: a.competition.nombre,
+          nivel: a.competition.nivel,
+          area: a.competition.area,
+          modalidad: a.competition.modalidad,
+          estado: a.competition.estado,
+          fechaAsignacion: a.fechaAsignacion,
+          totalInscritos: a.competition._count.inscripciones,
+          etapas: a.competition.etapas,
+        })),
+      });
+    } catch (error) {
+      console.error("❌ [ERROR] En mis-competencias:", error);
+      res.status(500).json({ ok: false, message: "Error al obtener competencias" });
+    }
+  }
+);
+
 // Asignar evaluador a competencia
 router.post(
   "/asignar/:competitionId",
@@ -17,7 +75,6 @@ router.post(
       const { competitionId } = req.params;
       const evaluadorId = req.user.id;
 
-      // Verificar que la competencia existe
       const competition = await prisma.competition.findUnique({
         where: { id: competitionId },
       });
@@ -26,7 +83,6 @@ router.post(
         return res.status(404).json({ ok: false, message: "Competencia no encontrada" });
       }
 
-      // Verificar si ya está asignado
       const yaAsignado = await prisma.evaluadorCompetencia.findUnique({
         where: {
           evaluadorId_competitionId: {
@@ -40,7 +96,6 @@ router.post(
         return res.status(409).json({ ok: false, message: "Ya estás asignado a esta competencia" });
       }
 
-      // Crear asignación
       const asignacion = await prisma.evaluadorCompetencia.create({
         data: {
           evaluadorId,
@@ -103,60 +158,6 @@ router.delete(
   }
 );
 
-// Obtener competencias asignadas al evaluador
-router.get(
-  "/mis-competencias",
-  authRequired,
-  requirePerm("evaluaciones.read"),
-  async (req: any, res) => {
-    try {
-      const evaluadorId = req.user.id;
-
-      const asignaciones = await prisma.evaluadorCompetencia.findMany({
-        where: { evaluadorId },
-        include: {
-          competition: {
-            include: {
-              etapas: {
-                select: {
-                  etapa: true,
-                  fechaInicio: true,
-                  fechaFin: true,
-                },
-                orderBy: { fechaInicio: "asc" },
-              },
-              _count: {
-                select: {
-                  inscripciones: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: { fechaAsignacion: "desc" },
-      });
-
-      res.json({
-        ok: true,
-        competencias: asignaciones.map((a) => ({
-          id: a.competition.id,
-          nombre: a.competition.nombre,
-          nivel: a.competition.nivel,
-          area: a.competition.area,
-          modalidad: a.competition.modalidad,
-          estado: a.competition.estado,
-          fechaAsignacion: a.fechaAsignacion,
-          totalInscritos: a.competition._count.inscripciones,
-          etapas: a.competition.etapas,
-        })),
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ ok: false, message: "Error al obtener competencias" });
-    }
-  }
-);
-
 // Verificar si está asignado a una competencia
 router.get(
   "/verificar/:competitionId",
@@ -194,7 +195,6 @@ router.get(
       const { competitionId } = req.params;
       const evaluadorId = req.user.id;
 
-      // Verificar que el evaluador está asignado a esta competencia
       const asignacion = await prisma.evaluadorCompetencia.findUnique({
         where: {
           evaluadorId_competitionId: {
@@ -208,7 +208,6 @@ router.get(
         return res.status(403).json({ ok: false, message: "No estás asignado a esta competencia" });
       }
 
-      // Obtener estudiantes inscritos
       const inscripciones = await prisma.inscripcion.findMany({
         where: { competitionId },
         include: {
@@ -232,7 +231,6 @@ router.get(
         orderBy: { fechaInscripcion: "asc" },
       });
 
-      // Obtener evaluaciones existentes
       const evaluaciones = await prisma.evaluacion.findMany({
         where: {
           evaluadorId,
@@ -289,7 +287,6 @@ router.post(
 
       const { calificacion, detalles } = parsed.data;
 
-      // Verificar asignación
       const asignacion = await prisma.evaluadorCompetencia.findUnique({
         where: {
           evaluadorId_competitionId: {
@@ -303,7 +300,6 @@ router.post(
         return res.status(403).json({ ok: false, message: "No estás asignado a esta competencia" });
       }
 
-      // Verificar que el estudiante está inscrito
       const inscripcion = await prisma.inscripcion.findFirst({
         where: {
           userId: estudianteId,
@@ -315,7 +311,6 @@ router.post(
         return res.status(404).json({ ok: false, message: "El estudiante no está inscrito en esta competencia" });
       }
 
-      // Crear o actualizar evaluación
       const evaluacion = await prisma.evaluacion.upsert({
         where: {
           evaluadorId_estudianteId_competitionId: {
