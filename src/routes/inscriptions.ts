@@ -63,7 +63,7 @@ router.get("/mis", authRequired, requirePerm("inscriptions.read"), async (req: a
         etapaActual: calcularEtapaActual(i.competition.etapas || [])
       },
       fechaInscripcion: i.fechaInscripcion,
-      createdAt: i.createdAt,
+      // ELIMINADO: createdAt: i.createdAt, // Esta propiedad no existe en Inscripcion
     }));
 
     return res.json({ 

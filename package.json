@@ -1,11 +1,11 @@
 {
-  "name": "back",
+  "name": "oh-sansi-backend",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "tsc && npx prisma generate",
+    "start": "node index.js",
     "postinstall": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "prisma:dev": "prisma migrate dev --name init",
@@ -13,10 +13,16 @@
     "migrate": "prisma migrate dev",
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "oh-sansi",
+    "backend",
+    "express",
+    "prisma",
+    "postgresql"
+  ],
+  "author": "Fabian Marco",
   "license": "ISC",
-  "description": "",
+  "description": "Backend para sistema OH SANSI - Gestión de competencias estudiantiles",
   "dependencies": {
     "@prisma/client": "^6.16.2",
     "@types/bcryptjs": "^2.4.6",
@@ -25,16 +31,13 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "nodemon": "^3.1.10",
     "zod": "^4.1.11"
   },
   "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.5.2",
-    "bcrypt": "^6.0.0",
     "prisma": "^6.16.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
@@ -42,5 +45,8 @@
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

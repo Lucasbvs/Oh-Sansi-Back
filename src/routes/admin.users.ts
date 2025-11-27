@@ -1,7 +1,7 @@
 //src/routes/admin.users.ts
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { authRequired } from "../middleware/auth";
 import { Ciudad } from "@prisma/client"; // 👈 importa el enum
