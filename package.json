@@ -6,7 +6,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc && npx prisma generate",
     "start": "node index.js",
-    "vercel-build": "npm run build && npx prisma migrate deploy",
+    "vercel-build": "pnpm run build && pnpm run prisma:generate && pnpm run migrate:deploy",
     "postinstall": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "prisma:dev": "prisma migrate dev --name init",
@@ -49,5 +49,6 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "packageManager": "pnpm@9.0.0"
 }

@@ -2,6 +2,16 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
+// Importar todas las rutas DESDE LA CARPETA CORRECTA
+const authRoutes = require("./routes/routes/auth");
+const competitionsRoutes = require("./routes/routes/competitions");
+const usersRoutes = require("./routes/routes/users");
+const adminUsersRoutes = require("./routes/routes/admin.users");
+const rolesRoutes = require("./routes/routes/roles");
+const inscriptionsRoutes = require("./routes/routes/inscriptions");
+const tutoresRoutes = require("./routes/routes/tutores");
+const evaluacionesRoutes = require("./routes/routes/evaluaciones");
+
 const app = express();
 
 // CORS
