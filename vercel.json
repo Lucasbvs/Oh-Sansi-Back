@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
   "version": 2,
   "builds": [
     {
@@ -19,18 +18,4 @@
   "env": {
     "NODE_ENV": "production"
   }
-=======
-    "builds": [
-        {
-            "src": "./index.js",
-            "use": "@vercel/node"
-        }
-    ],
-    "routes":[
-        {
-            "src": "/(.*)",
-            "dest": "/"
-        }
-    ]
->>>>>>> 974929a28673b73d4b7bc743182f25ff807b7696
 }
