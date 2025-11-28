@@ -1,53 +1,57 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = require("express");
-const prisma_1 = require("../lib/prisma");
-const zod_1 = require("zod");
-const auth_1 = require("../middleware/auth");
-const perm_1 = require("../middleware/perm");
-const router = (0, express_1.Router)();
+const express = require("express");
+const { prisma } = require("../lib/prisma");
+const { z } = require("zod");
+const { authRequired } = require("../middleware/auth");
+const { requirePerm } = require("../middleware/perm");
+
+const router = express.Router();
+
 /* =================== ZOD SCHEMAS =================== */
-const FaseSchema = zod_1.z.object({
-    nombre: zod_1.z.string().min(2).max(80),
-    fechaInicio: zod_1.z.string().transform((v) => new Date(v)),
-    fechaFin: zod_1.z.string().transform((v) => new Date(v)),
+const FaseSchema = z.object({
+    nombre: z.string().min(2).max(80),
+    fechaInicio: z.string().transform((v) => new Date(v)),
+    fechaFin: z.string().transform((v) => new Date(v)),
 });
-const EtapaItemSchema = zod_1.z
+
+const EtapaItemSchema = z
     .object({
-    etapa: zod_1.z.enum(["INSCRIPCION", "DESARROLLO", "EVALUACION", "CORRECCION", "PREMIACION"]),
-    fechaInicio: zod_1.z.string().transform((v) => new Date(v)),
-    fechaFin: zod_1.z.string().nullable().transform((v) => (v ? new Date(v) : null)),
-})
+        etapa: z.enum(["INSCRIPCION", "DESARROLLO", "EVALUACION", "CORRECCION", "PREMIACION"]),
+        fechaInicio: z.string().transform((v) => new Date(v)),
+        fechaFin: z.string().nullable().transform((v) => (v ? new Date(v) : null)),
+    })
     .superRefine((val, ctx) => {
-    if (val.etapa !== "CORRECCION" && !val.fechaFin) {
-        ctx.addIssue({
-            code: zod_1.z.ZodIssueCode.custom,
-            message: "fechaFin es obligatoria para esta etapa",
-            path: ["fechaFin"],
-        });
-    }
+        if (val.etapa !== "CORRECCION" && !val.fechaFin) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "fechaFin es obligatoria para esta etapa",
+                path: ["fechaFin"],
+            });
+        }
+    });
+
+const CompetitionCreateBody = z.object({
+    nombre: z.string().min(3),
+    nivel: z.enum(["PRINCIPIANTE", "INTERMEDIO", "AVANZADO"]),
+    area: z.enum(["MATEMATICA", "FISICA", "ROBOTICA", "QUIMICA", "PROGRAMACION"]),
+    participantes: z.number().min(1).max(5),
+    modalidad: z.enum(["PRESENCIAL", "VIRTUAL"]),
+    formaCalificacion: z.string().max(400),
+    fases: z.array(FaseSchema).min(1),
+    etapas: z.array(EtapaItemSchema).min(1),
 });
-const CompetitionCreateBody = zod_1.z.object({
-    nombre: zod_1.z.string().min(3),
-    nivel: zod_1.z.enum(["PRINCIPIANTE", "INTERMEDIO", "AVANZADO"]),
-    area: zod_1.z.enum(["MATEMATICA", "FISICA", "ROBOTICA", "QUIMICA", "PROGRAMACION"]),
-    participantes: zod_1.z.number().min(1).max(5),
-    modalidad: zod_1.z.enum(["PRESENCIAL", "VIRTUAL"]),
-    formaCalificacion: zod_1.z.string().max(400),
-    fases: zod_1.z.array(FaseSchema).min(1),
-    etapas: zod_1.z.array(EtapaItemSchema).min(1),
+
+const CompetitionUpdateBody = z.object({
+    nombre: z.string().min(3).optional(),
+    nivel: z.enum(["PRINCIPIANTE", "INTERMEDIO", "AVANZADO"]).optional(),
+    area: z.enum(["MATEMATICA", "FISICA", "ROBOTICA", "QUIMICA", "PROGRAMACION"]).optional(),
+    participantes: z.number().min(1).max(5).optional(),
+    modalidad: z.enum(["PRESENCIAL", "VIRTUAL"]).optional(),
+    formaCalificacion: z.string().max(400).optional(),
+    fechaInicio: z.string().transform((v) => new Date(v)).optional(),
+    fases: z.array(FaseSchema).min(1).optional(),
+    etapas: z.array(EtapaItemSchema).min(1).optional(),
 });
-const CompetitionUpdateBody = zod_1.z.object({
-    nombre: zod_1.z.string().min(3).optional(),
-    nivel: zod_1.z.enum(["PRINCIPIANTE", "INTERMEDIO", "AVANZADO"]).optional(),
-    area: zod_1.z.enum(["MATEMATICA", "FISICA", "ROBOTICA", "QUIMICA", "PROGRAMACION"]).optional(),
-    participantes: zod_1.z.number().min(1).max(5).optional(),
-    modalidad: zod_1.z.enum(["PRESENCIAL", "VIRTUAL"]).optional(),
-    formaCalificacion: zod_1.z.string().max(400).optional(),
-    fechaInicio: zod_1.z.string().transform((v) => new Date(v)).optional(),
-    fases: zod_1.z.array(FaseSchema).min(1).optional(),
-    etapas: zod_1.z.array(EtapaItemSchema).min(1).optional(),
-});
+
 /* =================== HELPERS =================== */
 function validarSolapes(fases) {
     const s = [...fases].sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime());
@@ -58,6 +62,7 @@ function validarSolapes(fases) {
     }
     return null;
 }
+
 function validarFasesEnDesarrollo(fases, etapas) {
     const etapaDesarrollo = etapas.find(e => e.etapa === "DESARROLLO");
     if (!etapaDesarrollo) {
@@ -79,26 +84,33 @@ function validarFasesEnDesarrollo(fases, etapas) {
     }
     return null;
 }
+
 function ahora() { return new Date(); }
+
 function isBetween(d, ini, fin) {
     const t = d.getTime(), a = ini.getTime(), b = fin ? fin.getTime() : Number.POSITIVE_INFINITY;
     return t >= a && t <= b;
 }
+
 /* =================== RUTAS =================== */
 // Crear
-router.post("/", auth_1.authRequired, (0, perm_1.requirePerm)("competitions.create"), async (req, res) => {
+router.post("/", authRequired, requirePerm("competitions.create"), async (req, res) => {
     const parsed = CompetitionCreateBody.safeParse(req.body);
     if (!parsed.success)
         return res.status(400).json({ ok: false, message: "Datos inválidos", errors: parsed.error.issues });
+
     const data = parsed.data;
+
     // Validación existente de solapamiento
     const err = validarSolapes(data.fases.map((f) => ({ ...f, nombre: f.nombre })));
     if (err)
         return res.status(400).json({ ok: false, message: err });
+
     const errFasesDesarrollo = validarFasesEnDesarrollo(data.fases.map((f) => ({ ...f, nombre: f.nombre })), data.etapas);
     if (errFasesDesarrollo)
         return res.status(400).json({ ok: false, message: errFasesDesarrollo });
-    const competition = await prisma_1.prisma.competition.create({
+
+    const competition = await prisma.competition.create({
         data: {
             nombre: data.nombre,
             nivel: data.nivel,
@@ -119,33 +131,40 @@ router.post("/", auth_1.authRequired, (0, perm_1.requirePerm)("competitions.crea
         },
         include: { fases: true, etapas: true },
     });
+
     res.status(201).json({ ok: true, competition });
 });
+
 // Listar (home)
-router.get("/", auth_1.authRequired, (0, perm_1.requirePerm)("competitions.read"), async (req, res) => {
+router.get("/", authRequired, requirePerm("competitions.read"), async (req, res) => {
     const includeHidden = req.user.roleSlug === "ADMIN";
     const where = includeHidden ? {} : { estado: true };
     const { q, nivel, area } = req.query ?? {};
+
     if (q && typeof q === "string") {
         where.OR = [
             { nombre: { contains: q, mode: "insensitive" } },
             { area: { equals: area } },
         ];
     }
+
     if (nivel && typeof nivel === "string")
         where.nivel = nivel;
     if (area && typeof area === "string")
         where.area = area;
-    const competitions = await prisma_1.prisma.competition.findMany({
+
+    const competitions = await prisma.competition.findMany({
         where,
         include: { fases: true, etapas: true },
         orderBy: { createdAt: "desc" },
     });
+
     res.json({ ok: true, competitions });
 });
+
 // En la ruta GET /:id
-router.get("/:id", auth_1.authRequired, (0, perm_1.requirePerm)("competitions.read"), async (req, res) => {
-    const c = await prisma_1.prisma.competition.findUnique({
+router.get("/:id", authRequired, requirePerm("competitions.read"), async (req, res) => {
+    const c = await prisma.competition.findUnique({
         where: { id: req.params.id },
         include: {
             fases: true,
@@ -157,8 +176,10 @@ router.get("/:id", auth_1.authRequired, (0, perm_1.requirePerm)("competitions.re
             },
         },
     });
+
     if (!c)
         return res.status(404).json({ ok: false, message: "No encontrado" });
+
     res.json({
         ok: true,
         competition: {
@@ -168,24 +189,30 @@ router.get("/:id", auth_1.authRequired, (0, perm_1.requirePerm)("competitions.re
         },
     });
 });
+
 // Actualizar
-router.put("/:id", auth_1.authRequired, (0, perm_1.requirePerm)("competitions.update"), async (req, res) => {
+router.put("/:id", authRequired, requirePerm("competitions.update"), async (req, res) => {
     const parsed = CompetitionUpdateBody.safeParse(req.body);
     if (!parsed.success)
         return res.status(400).json({ ok: false, message: "Datos inválidos", errors: parsed.error.issues });
+
     const data = parsed.data;
-    const exists = await prisma_1.prisma.competition.findUnique({ where: { id: req.params.id } });
+
+    const exists = await prisma.competition.findUnique({ where: { id: req.params.id } });
     if (!exists)
         return res.status(404).json({ ok: false, message: "No encontrado" });
+
     if (data.fases && data.etapas) {
         const err = validarSolapes(data.fases.map((f) => ({ ...f, nombre: f.nombre })));
         if (err)
             return res.status(400).json({ ok: false, message: err });
+
         const errFasesDesarrollo = validarFasesEnDesarrollo(data.fases.map((f) => ({ ...f, nombre: f.nombre })), data.etapas);
         if (errFasesDesarrollo)
             return res.status(400).json({ ok: false, message: errFasesDesarrollo });
     }
-    const updated = await prisma_1.prisma.competition.update({
+
+    const updated = await prisma.competition.update({
         where: { id: req.params.id },
         data: {
             nombre: data.nombre,
@@ -198,115 +225,146 @@ router.put("/:id", auth_1.authRequired, (0, perm_1.requirePerm)("competitions.up
         },
         include: { fases: true, etapas: true },
     });
+
     if (data.fases) {
         const err = validarSolapes(data.fases.map((f) => ({ ...f, nombre: f.nombre })));
         if (err)
             return res.status(400).json({ ok: false, message: err });
+
         if (data.etapas) {
             const errFasesDesarrollo = validarFasesEnDesarrollo(data.fases.map((f) => ({ ...f, nombre: f.nombre })), data.etapas);
             if (errFasesDesarrollo)
                 return res.status(400).json({ ok: false, message: errFasesDesarrollo });
         }
-        await prisma_1.prisma.fase.deleteMany({ where: { competitionId: updated.id } });
-        await prisma_1.prisma.fase.createMany({
+
+        await prisma.fase.deleteMany({ where: { competitionId: updated.id } });
+        await prisma.fase.createMany({
             data: data.fases.map((f) => ({
                 nombre: f.nombre, fechaInicio: f.fechaInicio, fechaFin: f.fechaFin, competitionId: updated.id,
             })),
         });
     }
+
     if (data.etapas) {
-        await prisma_1.prisma.etapaCompetencia.deleteMany({ where: { competitionId: updated.id } });
-        await prisma_1.prisma.etapaCompetencia.createMany({
+        await prisma.etapaCompetencia.deleteMany({ where: { competitionId: updated.id } });
+        await prisma.etapaCompetencia.createMany({
             data: data.etapas.map((e) => ({
                 etapa: e.etapa, fechaInicio: e.fechaInicio, fechaFin: e.fechaFin ?? null, competitionId: updated.id,
             })),
         });
     }
-    const final = await prisma_1.prisma.competition.findUnique({
+
+    const final = await prisma.competition.findUnique({
         where: { id: req.params.id },
         include: { fases: true, etapas: true },
     });
+
     res.json({ ok: true, competition: final });
 });
+
 // Cambiar estado 
-router.put("/:id/estado", auth_1.authRequired, async (req, res) => {
+router.put("/:id/estado", authRequired, async (req, res) => {
     if (req.user.roleSlug !== "ADMIN")
         return res.status(403).json({ ok: false, message: "Solo ADMIN" });
-    const comp = await prisma_1.prisma.competition.findUnique({ where: { id: req.params.id } });
+
+    const comp = await prisma.competition.findUnique({ where: { id: req.params.id } });
     if (!comp)
         return res.status(404).json({ ok: false, message: "No encontrado" });
-    const updated = await prisma_1.prisma.competition.update({
+
+    const updated = await prisma.competition.update({
         where: { id: req.params.id },
         data: { estado: !comp.estado },
     });
+
     res.json({ ok: true, competition: updated });
 });
+
 // Eliminar 
-router.delete("/:id", auth_1.authRequired, (0, perm_1.requirePerm)("competitions.delete"), async (req, res) => {
-    const comp = await prisma_1.prisma.competition.findUnique({ where: { id: req.params.id } });
+router.delete("/:id", authRequired, requirePerm("competitions.delete"), async (req, res) => {
+    const comp = await prisma.competition.findUnique({ where: { id: req.params.id } });
     if (!comp)
         return res.status(404).json({ ok: false, message: "No encontrado" });
+
     if (req.user.roleSlug === "ADMIN") {
-        await prisma_1.prisma.competition.delete({ where: { id: req.params.id } });
+        await prisma.competition.delete({ where: { id: req.params.id } });
         return res.json({ ok: true, deleted: true });
     }
     else {
-        await prisma_1.prisma.competition.update({ where: { id: req.params.id }, data: { estado: false } });
+        await prisma.competition.update({ where: { id: req.params.id }, data: { estado: false } });
         return res.json({ ok: true, deleted: false });
     }
 });
-router.post("/:id/inscribirse", auth_1.authRequired, (0, perm_1.requirePerm)("inscriptions.create"), async (req, res) => {
-    const comp = await prisma_1.prisma.competition.findUnique({
+
+router.post("/:id/inscribirse", authRequired, requirePerm("inscriptions.create"), async (req, res) => {
+    const comp = await prisma.competition.findUnique({
         where: { id: req.params.id },
-        include: { etapas: true, inscripciones: { where: { userId: req.user.id }, select: { id: true } } },
+        include: { 
+            etapas: true, 
+            inscripciones: { 
+                where: { userId: req.user.id }, 
+                select: { id: true } 
+            } 
+        }
     });
+
     if (!comp || !comp.estado)
         return res.status(404).json({ ok: false, message: "Competencia no disponible" });
+
     if ((comp.inscripciones?.length ?? 0) > 0) {
         return res.status(409).json({ ok: false, message: "Ya estás inscrito en esta competencia" });
     }
-    const estudiante = await prisma_1.prisma.user.findUnique({
+
+    const estudiante = await prisma.user.findUnique({
         where: { id: req.user.id },
         select: {
             tutorId: true,
             role: { select: { slug: true } }
         }
     });
+
     if (estudiante?.role?.slug === "ESTUDIANTE" && !estudiante.tutorId) {
         return res.status(400).json({
             ok: false,
             message: "No puedes inscribirte sin tener un tutor asignado. Por favor, asigna un tutor primero desde la sección de Tutores."
         });
     }
+
     const insc = comp.etapas.find(e => e.etapa === "INSCRIPCION");
     if (insc) {
         const dentro = isBetween(ahora(), insc.fechaInicio, insc.fechaFin ?? undefined);
         if (!dentro)
             return res.status(400).json({ ok: false, message: "La etapa de inscripción no está vigente" });
     }
-    await prisma_1.prisma.inscripcion.create({
+
+    await prisma.inscripcion.create({
         data: {
             userId: req.user.id,
             competitionId: comp.id
         }
     });
+
     res.json({ ok: true, message: "Inscripción realizada" });
 });
-router.delete("/:id/desinscribirse", auth_1.authRequired, (0, perm_1.requirePerm)("inscriptions.delete"), async (req, res) => {
+
+router.delete("/:id/desinscribirse", authRequired, requirePerm("inscriptions.delete"), async (req, res) => {
     try {
         const competitionId = req.params.id;
         const authUserId = req.user?.id ?? req.user?.userId ?? req.user?.sub;
+
         if (!authUserId) {
             return res.status(401).json({ ok: false, message: "Usuario no autenticado" });
         }
-        const insc = await prisma_1.prisma.inscripcion.findFirst({
+
+        const insc = await prisma.inscripcion.findFirst({
             where: { userId: authUserId, competitionId },
             select: { id: true },
         });
+
         if (!insc) {
             return res.status(404).json({ ok: false, message: "No estás inscrito en esta competencia" });
         }
-        await prisma_1.prisma.inscripcion.delete({ where: { id: insc.id } });
+
+        await prisma.inscripcion.delete({ where: { id: insc.id } });
         return res.json({ ok: true, message: "Desinscripción realizada" });
     }
     catch (e) {
@@ -314,4 +372,6 @@ router.delete("/:id/desinscribirse", auth_1.authRequired, (0, perm_1.requirePerm
         return res.status(500).json({ ok: false, message: "Error al desinscribirse" });
     }
 });
-exports.default = router;
+
+
+module.exports = router;

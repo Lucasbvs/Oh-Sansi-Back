@@ -1,55 +1,57 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-// src/routes/roles.ts
-const express_1 = require("express");
-const prisma_1 = require("../lib/prisma");
-const zod_1 = require("zod");
-const auth_1 = require("../middleware/auth");
-const perm_1 = require("../middleware/perm");
-const client_1 = require("@prisma/client");
-const router = (0, express_1.Router)();
-const PermsSchema = zod_1.z.object({
-    navbar: zod_1.z.object({
-        home: zod_1.z.boolean().optional(),
-        competencias: zod_1.z.boolean().optional(),
-        usuarios: zod_1.z.boolean().optional(),
-        roles: zod_1.z.boolean().optional(),
-        tutorias: zod_1.z.boolean().optional(), // ✅ NUEVO
+const express = require("express");
+const { prisma } = require("../lib/prisma");
+const { z } = require("zod");
+const { authRequired } = require("../middleware/auth");
+const { requirePerm } = require("../middleware/perm");
+const { Prisma } = require("@prisma/client");
+
+const router = express.Router();
+
+const PermsSchema = z.object({
+    navbar: z.object({
+        home: z.boolean().optional(),
+        competencias: z.boolean().optional(),
+        usuarios: z.boolean().optional(),
+        roles: z.boolean().optional(),
+        tutorias: z.boolean().optional(), // ✅ NUEVO
     }).optional(),
-    competitions: zod_1.z.object({
-        read: zod_1.z.boolean().optional(),
-        create: zod_1.z.boolean().optional(),
-        update: zod_1.z.boolean().optional(),
-        delete: zod_1.z.boolean().optional(),
+    competitions: z.object({
+        read: z.boolean().optional(),
+        create: z.boolean().optional(),
+        update: z.boolean().optional(),
+        delete: z.boolean().optional(),
     }).optional(),
-    users: zod_1.z.object({
-        read: zod_1.z.boolean().optional(),
-        create: zod_1.z.boolean().optional(),
-        update: zod_1.z.boolean().optional(),
-        delete: zod_1.z.boolean().optional(),
+    users: z.object({
+        read: z.boolean().optional(),
+        create: z.boolean().optional(),
+        update: z.boolean().optional(),
+        delete: z.boolean().optional(),
     }).optional(),
-    inscriptions: zod_1.z.object({
-        read: zod_1.z.boolean().optional(), // ver "Mis competencias"
-        create: zod_1.z.boolean().optional(), // inscribirse
-        delete: zod_1.z.boolean().optional(), // cancelar inscripción
+    inscriptions: z.object({
+        read: z.boolean().optional(), // ver "Mis competencias"
+        create: z.boolean().optional(), // inscribirse
+        delete: z.boolean().optional(), // cancelar inscripción
     }).optional(),
     // ✅ NUEVO: Permisos de tutorías
-    tutorias: zod_1.z.object({
-        read: zod_1.z.boolean().optional(), // Ver listado de tutorías
-        manage: zod_1.z.boolean().optional(), // Gestionar asignaciones (solo admin)
+    tutorias: z.object({
+        read: z.boolean().optional(), // Ver listado de tutorías
+        manage: z.boolean().optional(), // Gestionar asignaciones (solo admin)
     }).optional(),
 }).optional();
-const RoleBody = zod_1.z.object({
-    name: zod_1.z.string().min(2).max(40),
-    slug: zod_1.z.string().regex(/^[A-Z0-9_]+$/).min(3).max(40),
+
+const RoleBody = z.object({
+    name: z.string().min(2).max(40),
+    slug: z.string().regex(/^[A-Z0-9_]+$/).min(3).max(40),
     permissions: PermsSchema,
 });
+
 const isAdminSlug = (s) => s === "ADMIN";
+
 /* =========================
    Helpers
    ========================= */
 function mapCreateUpdateError(err) {
-    if (err instanceof client_1.Prisma.PrismaClientKnownRequestError) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
         // P2002 => unique constraint violation
         if (err.code === "P2002") {
             const target = err.meta?.target ?? [];
@@ -64,12 +66,13 @@ function mapCreateUpdateError(err) {
     }
     return { status: 500, message: "Error interno del servidor" };
 }
+
 /* =========================
    Rutas
    ========================= */
 // === Listar (cualquiera con users.read) ===
-router.get("/", auth_1.authRequired, (0, perm_1.requirePerm)("users.read"), async (_req, res) => {
-    const roles = await prisma_1.prisma.role.findMany({
+router.get("/", authRequired, requirePerm("users.read"), async (_req, res) => {
+    const roles = await prisma.role.findMany({
         orderBy: { createdAt: "desc" },
         select: {
             id: true,
@@ -83,9 +86,10 @@ router.get("/", auth_1.authRequired, (0, perm_1.requirePerm)("users.read"), asyn
     });
     res.json({ ok: true, roles });
 });
+
 // === Obtener uno por id (cualquiera con users.read) ===
-router.get("/:id", auth_1.authRequired, (0, perm_1.requirePerm)("users.read"), async (req, res) => {
-    const r = await prisma_1.prisma.role.findUnique({
+router.get("/:id", authRequired, requirePerm("users.read"), async (req, res) => {
+    const r = await prisma.role.findUnique({
         where: { id: req.params.id },
         select: {
             id: true,
@@ -101,8 +105,9 @@ router.get("/:id", auth_1.authRequired, (0, perm_1.requirePerm)("users.read"), a
         return res.status(404).json({ ok: false, message: "No encontrado" });
     res.json({ ok: true, role: r });
 });
+
 // === Crear (solo ADMIN) ===
-router.post("/", auth_1.authRequired, async (req, res) => {
+router.post("/", authRequired, async (req, res) => {
     if (req.user.roleSlug !== "ADMIN")
         return res.status(403).json({ ok: false, message: "Solo ADMIN" });
     const parsed = RoleBody.safeParse(req.body);
@@ -113,7 +118,7 @@ router.post("/", auth_1.authRequired, async (req, res) => {
     if (isAdminSlug(slug))
         return res.status(400).json({ ok: false, message: "Slug reservado" });
     try {
-        const role = await prisma_1.prisma.role.create({
+        const role = await prisma.role.create({
             data: { name, slug, isSystem: false, permissions: permissions ?? {} },
             select: { id: true, name: true, slug: true, isSystem: true, permissions: true, createdAt: true },
         });
@@ -124,14 +129,15 @@ router.post("/", auth_1.authRequired, async (req, res) => {
         res.status(status).json({ ok: false, message });
     }
 });
+
 // === Editar (solo ADMIN, no roles de sistema) ===
-router.put("/:id", auth_1.authRequired, async (req, res) => {
+router.put("/:id", authRequired, async (req, res) => {
     if (req.user.roleSlug !== "ADMIN")
         return res.status(403).json({ ok: false, message: "Solo ADMIN" });
     const parsed = RoleBody.partial().safeParse(req.body);
     if (!parsed.success)
         return res.status(400).json({ ok: false, message: "Datos inválidos", errors: parsed.error.issues });
-    const current = await prisma_1.prisma.role.findUnique({
+    const current = await prisma.role.findUnique({
         where: { id: req.params.id },
         select: { slug: true, isSystem: true },
     });
@@ -145,7 +151,7 @@ router.put("/:id", auth_1.authRequired, async (req, res) => {
         return res.status(400).json({ ok: false, message: "Slug reservado" });
     }
     try {
-        const role = await prisma_1.prisma.role.update({
+        const role = await prisma.role.update({
             where: { id: req.params.id },
             data: { ...parsed.data },
             select: { id: true, name: true, slug: true, isSystem: true, permissions: true, createdAt: true },
@@ -157,12 +163,13 @@ router.put("/:id", auth_1.authRequired, async (req, res) => {
         res.status(status).json({ ok: false, message });
     }
 });
+
 // === Eliminar (solo ADMIN, no roles de sistema) ===
-router.delete("/:id", auth_1.authRequired, async (req, res) => {
+router.delete("/:id", authRequired, async (req, res) => {
     if (req.user.roleSlug !== "ADMIN")
         return res.status(403).json({ ok: false, message: "Solo ADMIN" });
     try {
-        const current = await prisma_1.prisma.role.findUnique({
+        const current = await prisma.role.findUnique({
             where: { id: req.params.id },
             select: { id: true, slug: true, isSystem: true, _count: { select: { users: true } } },
         });
@@ -178,11 +185,11 @@ router.delete("/:id", auth_1.authRequired, async (req, res) => {
                 detail: `Usuarios asociados: ${current._count.users}`,
             });
         }
-        await prisma_1.prisma.role.delete({ where: { id: current.id } });
+        await prisma.role.delete({ where: { id: current.id } });
         res.json({ ok: true, message: "Rol eliminado" });
     }
     catch (err) {
-        if (err instanceof client_1.Prisma.PrismaClientKnownRequestError) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
             // P2003 => restricción FK; P2025 => registro no encontrado
             if (err.code === "P2003") {
                 return res.status(409).json({ ok: false, message: "No se puede eliminar por registros relacionados." });
@@ -195,4 +202,5 @@ router.delete("/:id", auth_1.authRequired, async (req, res) => {
         res.status(500).json({ ok: false, message: "Error interno del servidor" });
     }
 });
-exports.default = router;
+
+module.exports = router;

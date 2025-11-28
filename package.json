@@ -6,6 +6,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc && npx prisma generate",
     "start": "node index.js",
+    "vercel-build": "npm run build && npx prisma migrate deploy",
     "postinstall": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "prisma:dev": "prisma migrate dev --name init",
@@ -25,7 +26,6 @@
   "description": "Backend para sistema OH SANSI - Gestión de competencias estudiantiles",
   "dependencies": {
     "@prisma/client": "^6.16.2",
-    "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
@@ -34,10 +34,11 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
+    "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^24.5.2",
+    "@types/node": "^24.10.1",
     "prisma": "^6.16.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",

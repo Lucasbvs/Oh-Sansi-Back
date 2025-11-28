@@ -1,18 +1,17 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-// src/routes/evaluaciones.ts
-const express_1 = require("express");
-const prisma_1 = require("../lib/prisma");
-const auth_1 = require("../middleware/auth");
-const perm_1 = require("../middleware/perm");
-const zod_1 = require("zod");
-const router = (0, express_1.Router)();
+const express = require("express");
+const { prisma } = require("../lib/prisma");
+const { authRequired } = require("../middleware/auth");
+const { requirePerm } = require("../middleware/perm");
+const { z } = require("zod");
+
+const router = express.Router();
+
 // Obtener competencias asignadas al evaluador
-router.get("/mis-competencias", auth_1.authRequired, (0, perm_1.requirePerm)("evaluaciones.read"), async (req, res) => {
+router.get("/mis-competencias", authRequired, requirePerm("evaluaciones.read"), async (req, res) => {
     try {
         console.log("🔍 [DEBUG] Usuario en evaluaciones:", req.user);
         const evaluadorId = req.user.id;
-        const asignaciones = await prisma_1.prisma.evaluadorCompetencia.findMany({
+        const asignaciones = await prisma.evaluadorCompetencia.findMany({
             where: { evaluadorId },
             include: {
                 competition: {
@@ -56,18 +55,19 @@ router.get("/mis-competencias", auth_1.authRequired, (0, perm_1.requirePerm)("ev
         res.status(500).json({ ok: false, message: "Error al obtener competencias" });
     }
 });
+
 // Asignar evaluador a competencia
-router.post("/asignar/:competitionId", auth_1.authRequired, (0, perm_1.requirePerm)("evaluaciones.create"), async (req, res) => {
+router.post("/asignar/:competitionId", authRequired, requirePerm("evaluaciones.create"), async (req, res) => {
     try {
         const { competitionId } = req.params;
         const evaluadorId = req.user.id;
-        const competition = await prisma_1.prisma.competition.findUnique({
+        const competition = await prisma.competition.findUnique({
             where: { id: competitionId },
         });
         if (!competition) {
             return res.status(404).json({ ok: false, message: "Competencia no encontrada" });
         }
-        const yaAsignado = await prisma_1.prisma.evaluadorCompetencia.findUnique({
+        const yaAsignado = await prisma.evaluadorCompetencia.findUnique({
             where: {
                 evaluadorId_competitionId: {
                     evaluadorId,
@@ -78,7 +78,7 @@ router.post("/asignar/:competitionId", auth_1.authRequired, (0, perm_1.requirePe
         if (yaAsignado) {
             return res.status(409).json({ ok: false, message: "Ya estás asignado a esta competencia" });
         }
-        const asignacion = await prisma_1.prisma.evaluadorCompetencia.create({
+        const asignacion = await prisma.evaluadorCompetencia.create({
             data: {
                 evaluadorId,
                 competitionId,
@@ -101,12 +101,13 @@ router.post("/asignar/:competitionId", auth_1.authRequired, (0, perm_1.requirePe
         res.status(500).json({ ok: false, message: "Error al asignar evaluador" });
     }
 });
+
 // Desasignar evaluador de competencia
-router.delete("/desasignar/:competitionId", auth_1.authRequired, (0, perm_1.requirePerm)("evaluaciones.delete"), async (req, res) => {
+router.delete("/desasignar/:competitionId", authRequired, requirePerm("evaluaciones.delete"), async (req, res) => {
     try {
         const { competitionId } = req.params;
         const evaluadorId = req.user.id;
-        const asignacion = await prisma_1.prisma.evaluadorCompetencia.findUnique({
+        const asignacion = await prisma.evaluadorCompetencia.findUnique({
             where: {
                 evaluadorId_competitionId: {
                     evaluadorId,
@@ -117,7 +118,7 @@ router.delete("/desasignar/:competitionId", auth_1.authRequired, (0, perm_1.requ
         if (!asignacion) {
             return res.status(404).json({ ok: false, message: "No estás asignado a esta competencia" });
         }
-        await prisma_1.prisma.evaluadorCompetencia.delete({
+        await prisma.evaluadorCompetencia.delete({
             where: {
                 id: asignacion.id,
             },
@@ -129,12 +130,13 @@ router.delete("/desasignar/:competitionId", auth_1.authRequired, (0, perm_1.requ
         res.status(500).json({ ok: false, message: "Error al desasignar evaluador" });
     }
 });
+
 // Verificar si está asignado a una competencia
-router.get("/verificar/:competitionId", auth_1.authRequired, (0, perm_1.requirePerm)("evaluaciones.read"), async (req, res) => {
+router.get("/verificar/:competitionId", authRequired, requirePerm("evaluaciones.read"), async (req, res) => {
     try {
         const { competitionId } = req.params;
         const evaluadorId = req.user.id;
-        const asignacion = await prisma_1.prisma.evaluadorCompetencia.findUnique({
+        const asignacion = await prisma.evaluadorCompetencia.findUnique({
             where: {
                 evaluadorId_competitionId: {
                     evaluadorId,
@@ -149,12 +151,13 @@ router.get("/verificar/:competitionId", auth_1.authRequired, (0, perm_1.requireP
         res.status(500).json({ ok: false, message: "Error al verificar asignación" });
     }
 });
+
 // Obtener estudiantes de una competencia
-router.get("/estudiantes/:competitionId", auth_1.authRequired, (0, perm_1.requirePerm)("evaluaciones.read"), async (req, res) => {
+router.get("/estudiantes/:competitionId", authRequired, requirePerm("evaluaciones.read"), async (req, res) => {
     try {
         const { competitionId } = req.params;
         const evaluadorId = req.user.id;
-        const asignacion = await prisma_1.prisma.evaluadorCompetencia.findUnique({
+        const asignacion = await prisma.evaluadorCompetencia.findUnique({
             where: {
                 evaluadorId_competitionId: {
                     evaluadorId,
@@ -165,7 +168,7 @@ router.get("/estudiantes/:competitionId", auth_1.authRequired, (0, perm_1.requir
         if (!asignacion) {
             return res.status(403).json({ ok: false, message: "No estás asignado a esta competencia" });
         }
-        const inscripciones = await prisma_1.prisma.inscripcion.findMany({
+        const inscripciones = await prisma.inscripcion.findMany({
             where: { competitionId },
             include: {
                 user: {
@@ -187,7 +190,7 @@ router.get("/estudiantes/:competitionId", auth_1.authRequired, (0, perm_1.requir
             },
             orderBy: { fechaInscripcion: "asc" },
         });
-        const evaluaciones = await prisma_1.prisma.evaluacion.findMany({
+        const evaluaciones = await prisma.evaluacion.findMany({
             where: {
                 evaluadorId,
                 competitionId,
@@ -217,12 +220,14 @@ router.get("/estudiantes/:competitionId", auth_1.authRequired, (0, perm_1.requir
         res.status(500).json({ ok: false, message: "Error al obtener estudiantes" });
     }
 });
+
 // Crear o actualizar evaluación
-const EvaluacionSchema = zod_1.z.object({
-    calificacion: zod_1.z.number().min(0).max(100),
-    detalles: zod_1.z.string().optional(),
+const EvaluacionSchema = z.object({
+    calificacion: z.number().min(0).max(100),
+    detalles: z.string().optional(),
 });
-router.post("/calificar/:competitionId/:estudianteId", auth_1.authRequired, (0, perm_1.requirePerm)("evaluaciones.create"), async (req, res) => {
+
+router.post("/calificar/:competitionId/:estudianteId", authRequired, requirePerm("evaluaciones.create"), async (req, res) => {
     try {
         const { competitionId, estudianteId } = req.params;
         const evaluadorId = req.user.id;
@@ -231,7 +236,7 @@ router.post("/calificar/:competitionId/:estudianteId", auth_1.authRequired, (0, 
             return res.status(400).json({ ok: false, message: "Datos inválidos", errors: parsed.error.issues });
         }
         const { calificacion, detalles } = parsed.data;
-        const asignacion = await prisma_1.prisma.evaluadorCompetencia.findUnique({
+        const asignacion = await prisma.evaluadorCompetencia.findUnique({
             where: {
                 evaluadorId_competitionId: {
                     evaluadorId,
@@ -242,7 +247,7 @@ router.post("/calificar/:competitionId/:estudianteId", auth_1.authRequired, (0, 
         if (!asignacion) {
             return res.status(403).json({ ok: false, message: "No estás asignado a esta competencia" });
         }
-        const inscripcion = await prisma_1.prisma.inscripcion.findFirst({
+        const inscripcion = await prisma.inscripcion.findFirst({
             where: {
                 userId: estudianteId,
                 competitionId,
@@ -251,7 +256,7 @@ router.post("/calificar/:competitionId/:estudianteId", auth_1.authRequired, (0, 
         if (!inscripcion) {
             return res.status(404).json({ ok: false, message: "El estudiante no está inscrito en esta competencia" });
         }
-        const evaluacion = await prisma_1.prisma.evaluacion.upsert({
+        const evaluacion = await prisma.evaluacion.upsert({
             where: {
                 evaluadorId_estudianteId_competitionId: {
                     evaluadorId,
@@ -286,12 +291,13 @@ router.post("/calificar/:competitionId/:estudianteId", auth_1.authRequired, (0, 
         res.status(500).json({ ok: false, message: "Error al guardar evaluación" });
     }
 });
+
 // Obtener evaluación de un estudiante
-router.get("/estudiante/:competitionId/:estudianteId", auth_1.authRequired, (0, perm_1.requirePerm)("evaluaciones.read"), async (req, res) => {
+router.get("/estudiante/:competitionId/:estudianteId", authRequired, requirePerm("evaluaciones.read"), async (req, res) => {
     try {
         const { competitionId, estudianteId } = req.params;
         const evaluadorId = req.user.id;
-        const evaluacion = await prisma_1.prisma.evaluacion.findUnique({
+        const evaluacion = await prisma.evaluacion.findUnique({
             where: {
                 evaluadorId_estudianteId_competitionId: {
                     evaluadorId,
@@ -326,4 +332,5 @@ router.get("/estudiante/:competitionId/:estudianteId", auth_1.authRequired, (0, 
         res.status(500).json({ ok: false, message: "Error al obtener evaluación" });
     }
 });
-exports.default = router;
+
+module.exports = router;
